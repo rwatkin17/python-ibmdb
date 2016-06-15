@@ -59,6 +59,7 @@ const int _check_i = 1;
 #define LIBDB2 "libdb2.a"
 #else
 #define LIBDB2 "libdb400.a"
+#include <as400_protos.h>
 #endif
 #else
 #define DLOPEN dlopen
@@ -211,7 +212,11 @@ static PyTypeObject conn_handleType = {
 	  0,									 /*tp_getattro*/
 	  0,									 /*tp_setattro*/
 	  0,									 /*tp_as_buffer*/
-	  0,                                     /*tp_flags*/
+#if PY_MAJOR_VERSION < 3
+	  Py_TPFLAGS_HAVE_CLASS,						 /*tp_flags*/
+#else
+	  0,									 /*tp_flags*/
+#endif
 	  "IBM DataServer connection object",	/* tp_doc */
 	  0,									 /* tp_traverse */
 	  0,									 /* tp_clear */
@@ -308,7 +313,11 @@ static PyTypeObject stmt_handleType = {
 	0,						 /*tp_getattro		*/
 	0,						 /*tp_setattro		*/
 	0,						 /*tp_as_buffer		*/
-	0,	                     /*tp_flags			*/
+#if PY_MAJOR_VERSION < 3
+	Py_TPFLAGS_HAVE_CLASS,				 /*tp_flags*/
+#else
+	0,						 /*tp_flags*/
+#endif
 	"IBM DataServer cursor object", /* tp_doc		*/
 	0,						 /* tp_traverse		*/
 	0,						 /* tp_clear		  */
@@ -1405,9 +1414,9 @@ static PyObject *_python_ibm_db_connect_helper( PyObject *self, PyObject *args, 
 				
 				val = SQL_FALSE;
 				SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_INCLUDE_NULL_IN_LEN, &val, 0);
-                
-                val = SQL_TRUE;
-                SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_NON_HEXCCSID, &val, 0);
+				
+				val = SQL_TRUE;
+				SQLSetEnvAttr((SQLHENV)conn_res->henv, SQL_ATTR_NON_HEXCCSID, &val, 0);
 			}
 #endif
 		}
@@ -10583,7 +10592,8 @@ static PyObject* ibm_db_callproc(PyObject *self, PyObject *args){
 								break;
 							default:
 								if (!NIL_P(tmp_curr->svalue)) {
-									PyTuple_SetItem(outTuple, paramCount, StringOBJ_FromASCII(tmp_curr->svalue));
+									SQLLEN len = tmp_curr->bind_indicator == SQL_NTS ? strlen(tmp_curr->svalue) : tmp_curr->bind_indicator;
+									PyTuple_SetItem(outTuple, paramCount, StringOBJ_FromASCIIandSize(tmp_curr->svalue, len));
 									paramCount++;
 								} else if (!NIL_P(tmp_curr->uvalue)) {
 									PyTuple_SetItem(outTuple, paramCount, getSQLTCharAsPyUnicodeObject(tmp_curr->uvalue, tmp_curr->bind_indicator));
@@ -11116,20 +11126,37 @@ static SQLTCHAR* getUnicodeDataAsSQLTCHAR(PyObject* obj, int* isNewBuffer)
   
   *isNewBuffer = 0;
   
+#if PY_MAJOR_VERSION >= 3
   utf8 = PyUnicode_AsUTF8AndSize(obj, &utf8_len);
   if(utf8 == NULL)
   {
 	PyErr_Clear();
 	return NULL;
   }
+#else
+  PyObject* py_utf8 = PyUnicode_AsUTF8String(obj);
+  utf8_len = PyString_Size(py_utf8);
+  utf8 = PyString_AsString(py_utf8);
+  
+  if(utf8 == NULL)
+  {
+    Py_XDECREF(py_utf8);
+    PyErr_Clear();
+    return NULL;
+  }
+#endif
+  
+  buf = (SQLTCHAR *) PyMem_New(SQLTCHAR, utf8_len+1);
   
   *isNewBuffer = 1;
   
-  buf = (SQLTCHAR *) ALLOC_N(SQLTCHAR, utf8_len+1);
-  
   memcpy(buf, utf8, utf8_len);
-  utf8[utf8_len] = '\0';
+  buf[utf8_len] = '\0';
   
-  return utf8;
+#if PY_MAJOR_VERSION < 3
+  Py_XDECREF(py_utf8);
+#endif
+  
+  return buf;
 }
 #endif

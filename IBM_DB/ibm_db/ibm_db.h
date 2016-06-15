@@ -24,11 +24,14 @@
 #if  PY_MAJOR_VERSION < 3
 #define PyBytes_Check			PyString_Check
 #define StringOBJ_FromASCII(str)	PyString_FromString(str)
+#define StringOBJ_FromASCIIandSize(str, len)	PyString_FromStringAndSize(str, len)
 #define PyBytes_AsString		PyString_AsString
 #define PyBytes_FromStringAndSize	PyString_FromStringAndSize
 #define StringObj_Format		PyString_Format
 #define StringObj_Size			PyString_Size
+#ifndef PyObject_CheckBuffer
 #define PyObject_CheckBuffer		PyObject_CheckReadBuffer
+#endif
 #define PyVarObject_HEAD_INIT(type, size) \
 					PyObject_HEAD_INIT(type) size,
 #define Py_TYPE(ob)			(((PyObject*)(ob))->ob_type)
@@ -41,6 +44,7 @@
 #define PyInt_AsLong            	PyLong_AsLong
 #define PyInt_AS_LONG			PyLong_AsLong
 #define StringOBJ_FromASCII(str)	PyUnicode_DecodeASCII(str, strlen(str), NULL)
+#define StringOBJ_FromASCIIandSize(str, len)	PyUnicode_DecodeASCII(str, len, NULL)
 #define PyString_Check			PyUnicode_Check
 #define StringObj_Format		PyUnicode_Format
 #define StringObj_Size			PyUnicode_GET_SIZE
@@ -236,7 +240,7 @@ static PyTypeObject client_infoType = {
 		0,                                     /*tp_getattro    */
 		0,                                     /*tp_setattro    */
 		0,                                     /*tp_as_buffer   */
-		0,                                     /*tp_flags           */
+		Py_TPFLAGS_DEFAULT,            /*tp_flags                   */
 		"IBM DataServer Client Information object", /* tp_doc       */
 		0,                                     /* tp_traverse       */
 		0,                                     /* tp_clear          */
@@ -329,7 +333,7 @@ static PyTypeObject server_infoType = {
 		0,                                     /*tp_getattro    */
 		0,                                     /*tp_setattro    */
 		0,                                     /*tp_as_buffer   */
-		0,                                     /*tp_flags           */
+		Py_TPFLAGS_DEFAULT,            /*tp_flags                   */
 		"IBM DataServer Information object", /* tp_doc       */
 		0,                                     /* tp_traverse       */
 		0,                                     /* tp_clear          */
